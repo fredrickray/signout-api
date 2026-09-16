@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -10,12 +9,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/signout/signout-api/internal/config"
 	authhandler "github.com/signout/signout-api/internal/handler/auth"
 	appmw "github.com/signout/signout-api/internal/middleware"
-	"github.com/signout/signout-api/internal/repository/postgres"
+	mongorepo "github.com/signout/signout-api/internal/repository/mongo"
 	authsvc "github.com/signout/signout-api/internal/service/auth"
 	"github.com/signout/signout-api/pkg/response"
 )
@@ -23,7 +21,7 @@ import (
 type Server struct {
 	cfg    config.Config
 	http   *http.Server
-	pool   *pgxpool.Pool
+	mongo  *mongorepo.Client
 	logger *slog.Logger
 }
 
@@ -31,14 +29,13 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	pool, err := postgres.NewPool(ctx, cfg.DatabaseURL)
+	mongoClient, err := mongorepo.Connect(ctx, cfg.MongoURI, cfg.MongoDB)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := postgres.RunMigrations(ctx, pool, "migrations"); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("migrations: %w", err)
+	if err := mongoClient.EnsureIndexes(ctx); err != nil {
+		_ = mongoClient.Disconnect(context.Background())
+		return nil, err
 	}
 
 	tokenMgr := authsvc.NewTokenManager(
@@ -47,8 +44,8 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		cfg.JWTAccessTTL,
 		cfg.JWTRefreshTTL,
 	)
-	users := postgres.NewUserRepository(pool)
-	refresh := postgres.NewRefreshTokenRepository(pool)
+	users := mongorepo.NewUserRepository(mongoClient.DB)
+	refresh := mongorepo.NewRefreshTokenRepository(mongoClient.DB)
 	svc := authsvc.NewService(users, refresh, tokenMgr)
 	authH := authhandler.NewHandler(svc)
 
@@ -92,7 +89,7 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		IdleTimeout:  cfg.HTTPIdleTimeout,
 	}
 
-	return &Server{cfg: cfg, http: httpServer, pool: pool, logger: logger}, nil
+	return &Server{cfg: cfg, http: httpServer, mongo: mongoClient, logger: logger}, nil
 }
 
 func (s *Server) Start() error {
@@ -101,6 +98,6 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	defer s.pool.Close()
+	defer func() { _ = s.mongo.Disconnect(ctx) }()
 	return s.http.Shutdown(ctx)
 }
