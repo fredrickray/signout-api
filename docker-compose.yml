@@ -1,20 +1,16 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: signout-postgres
-    environment:
-      POSTGRES_USER: signout
-      POSTGRES_PASSWORD: signout
-      POSTGRES_DB: signout
+  mongo:
+    image: mongo:7
+    container_name: signout-mongo
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - signout_pg_data:/var/lib/postgresql/data
+      - signout_mongo_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U signout -d signout"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  signout_pg_data:
+  signout_mongo_data:

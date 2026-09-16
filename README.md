@@ -1,22 +1,21 @@
 # Sign-Out API
 
-Go backend for Sign-Out. This scaffold starts with **authentication**.
+Go backend for Sign-Out. Auth is backed by **MongoDB**.
 
 ## Layout
 
 ```
-cmd/api/                 # process entrypoint
+cmd/api/
 internal/
-  config/                # env-based configuration
-  domain/                # entities + domain errors
-  handler/auth/          # HTTP handlers
-  middleware/            # auth, recover, request id
-  repository/postgres/   # Postgres persistence
-  service/auth/          # business logic + JWT
-  server/                # router wiring
-migrations/              # SQL migrations
-pkg/response/            # JSON envelope helpers
-pkg/validator/           # request validation helpers
+  config/
+  domain/
+  handler/auth/
+  middleware/
+  repository/mongo/
+  service/auth/
+  server/
+pkg/response/
+pkg/validator/
 ```
 
 ## Quick start
@@ -27,7 +26,7 @@ docker compose up -d
 make run
 ```
 
-API listens on `http://localhost:8080`.
+API: `http://localhost:8080`
 
 ## Auth endpoints
 
@@ -46,25 +45,4 @@ API listens on `http://localhost:8080`.
 curl -s http://localhost:8080/v1/auth/register \
   -H 'Content-Type: application/json' \
   -d '{"email":"you@school.edu.ng","password":"password123","full_name":"Laetitia"}'
-```
-
-### Login
-
-```bash
-curl -s http://localhost:8080/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"you@school.edu.ng","password":"password123"}'
-```
-
-### Me
-
-```bash
-curl -s http://localhost:8080/v1/auth/me \
-  -H "Authorization: Bearer <access_token>"
-```
-
-Responses use a standard envelope:
-
-```json
-{ "success": true, "data": { ... } }
 ```

@@ -16,7 +16,8 @@ type Config struct {
 	HTTPReadTimeout    time.Duration
 	HTTPWriteTimeout   time.Duration
 	HTTPIdleTimeout    time.Duration
-	DatabaseURL        string
+	MongoURI           string
+	MongoDB            string
 	JWTAccessSecret    string
 	JWTRefreshSecret   string
 	JWTAccessTTL       time.Duration
@@ -33,7 +34,8 @@ func Load() (Config, error) {
 		HTTPReadTimeout:    getDuration("HTTP_READ_TIMEOUT", 10*time.Second),
 		HTTPWriteTimeout:   getDuration("HTTP_WRITE_TIMEOUT", 30*time.Second),
 		HTTPIdleTimeout:    getDuration("HTTP_IDLE_TIMEOUT", 60*time.Second),
-		DatabaseURL:        os.Getenv("DATABASE_URL"),
+		MongoURI:           getEnv("MONGODB_URI", "mongodb://localhost:27017"),
+		MongoDB:            getEnv("MONGODB_DB", "signout"),
 		JWTAccessSecret:    os.Getenv("JWT_ACCESS_SECRET"),
 		JWTRefreshSecret:   os.Getenv("JWT_REFRESH_SECRET"),
 		JWTAccessTTL:       getDuration("JWT_ACCESS_TTL", 15*time.Minute),
@@ -41,8 +43,8 @@ func Load() (Config, error) {
 		CORSAllowedOrigins: splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 	}
 
-	if cfg.DatabaseURL == "" {
-		return Config{}, fmt.Errorf("DATABASE_URL is required")
+	if cfg.MongoURI == "" {
+		return Config{}, fmt.Errorf("MONGODB_URI is required")
 	}
 	if len(cfg.JWTAccessSecret) < 32 {
 		return Config{}, fmt.Errorf("JWT_ACCESS_SECRET must be at least 32 characters")
