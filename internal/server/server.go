@@ -12,9 +12,11 @@ import (
 
 	"github.com/signout/signout-api/internal/config"
 	authhandler "github.com/signout/signout-api/internal/handler/auth"
+	celebhandler "github.com/signout/signout-api/internal/handler/celebration"
 	appmw "github.com/signout/signout-api/internal/middleware"
 	mongorepo "github.com/signout/signout-api/internal/repository/mongo"
 	authsvc "github.com/signout/signout-api/internal/service/auth"
+	celebsvc "github.com/signout/signout-api/internal/service/celebration"
 	"github.com/signout/signout-api/pkg/response"
 )
 
@@ -46,8 +48,17 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	)
 	users := mongorepo.NewUserRepository(mongoClient.DB)
 	refresh := mongorepo.NewRefreshTokenRepository(mongoClient.DB)
-	svc := authsvc.NewService(users, refresh, tokenMgr)
-	authH := authhandler.NewHandler(svc)
+	authSvc := authsvc.NewService(users, refresh, tokenMgr)
+	authH := authhandler.NewHandler(authSvc)
+
+	shirts := mongorepo.NewShirtRepository(mongoClient.DB)
+	if err := shirts.SeedDefaults(ctx); err != nil {
+		_ = mongoClient.Disconnect(context.Background())
+		return nil, err
+	}
+	celebrations := mongorepo.NewCelebrationRepository(mongoClient.DB)
+	celebSvc := celebsvc.NewService(shirts, celebrations)
+	celebH := celebhandler.NewHandler(celebSvc)
 
 	r := chi.NewRouter()
 	r.Use(appmw.Recover)
@@ -78,6 +89,15 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 				pr.Use(appmw.Authenticate(tokenMgr))
 				pr.Get("/me", authH.Me)
 			})
+		})
+
+		api.Get("/shirts", celebH.ListShirts)
+		api.Get("/celebrations/{slug}", celebH.GetBySlug)
+
+		api.Group(func(pr chi.Router) {
+			pr.Use(appmw.Authenticate(tokenMgr))
+			pr.Post("/celebrations", celebH.Create)
+			pr.Get("/celebrations", celebH.ListMine)
 		})
 	})
 

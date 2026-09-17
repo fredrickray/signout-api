@@ -60,5 +60,30 @@ func (c *Client) EnsureIndexes(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("refresh user_id index: %w", err)
 	}
+
+	shirts := c.DB.Collection("shirt_templates")
+	_, err = shirts.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    map[string]int{"slug": 1},
+		Options: options.Index().SetUnique(true).SetName("shirt_slug_uidx"),
+	})
+	if err != nil {
+		return fmt.Errorf("shirt slug index: %w", err)
+	}
+
+	celebrations := c.DB.Collection("celebrations")
+	_, err = celebrations.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    map[string]int{"slug": 1},
+		Options: options.Index().SetUnique(true).SetName("celebration_slug_uidx"),
+	})
+	if err != nil {
+		return fmt.Errorf("celebration slug index: %w", err)
+	}
+	_, err = celebrations.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    map[string]int{"user_id": 1},
+		Options: options.Index().SetName("celebration_user_id_idx"),
+	})
+	if err != nil {
+		return fmt.Errorf("celebration user_id index: %w", err)
+	}
 	return nil
 }
